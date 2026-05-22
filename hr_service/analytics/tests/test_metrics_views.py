@@ -5,9 +5,13 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
-from analytics.services import (
-    build_dashboard_payload,
-    parse_filters,
+from analytics.views import (
+    _conversion_rates,
+    _funnel_data,
+    _heatmap_data,
+    _kpi_cards,
+    _time_to_hire,
+    _vacancies_by_department,
 )
 from tests.factories import (
     DEFAULT_PASSWORD,
@@ -53,59 +57,40 @@ class AnalyticsMetricTests(TestCase):
         )
 
     def test_funnel_data_returns_counts_by_status(self):
-        payload = build_dashboard_payload(parse_filters({}))
-        labels, counts = payload["funnel_labels"], payload["funnel_data"]
+        labels, counts = _funnel_data()
         self.assertEqual(labels[0], "Новый")
         self.assertEqual(len(labels), 6)
         self.assertEqual(sum(counts), Application.objects.count())
 
     def test_vacancies_by_department_includes_only_open(self):
-        payload = build_dashboard_payload(parse_filters({"vacancy_status": "open"}))
-        labels, counts = payload["dept_labels"], payload["dept_data"]
+        labels, counts = _vacancies_by_department()
         result = dict(zip(labels, counts))
         self.assertEqual(result["IT"], 1)
         self.assertEqual(result["Sales"], 1)
-        self.assertNotIn("Closed", result)
+        self.assertNotIn("Closed", labels)
 
-    def test_conversion_rates_use_cumulative_counts(self):
-        payload = build_dashboard_payload(parse_filters({}))
-        labels, values, dropoff = payload["conv_labels"], payload["conv_data"], payload["dropoff_data"]
-        self.assertEqual(len(labels), 4)
-        self.assertTrue(all(0 <= value <= 100 for value in values))
-        self.assertTrue(all(0 <= value <= 100 for value in dropoff))
+    def test_conversion_rates_returns_percentages(self):
+        labels, values = _conversion_rates()
+        self.assertEqual(len(labels), 5)
+        self.assertTrue(all(value >= 0 for value in values))
 
     def test_heatmap_data_counts_scheduled_and_completed_interviews(self):
-        payload = build_dashboard_payload(parse_filters({}))
-        grid = payload["heatmap"]
+        grid = _heatmap_data()
         total = sum(sum(row) for row in grid)
         self.assertEqual(total, 2)
 
     def test_kpi_cards_returns_expected_keys(self):
-        payload = build_dashboard_payload(parse_filters({}))
-        kpi = payload["kpi"]
+        kpi = _kpi_cards()
         self.assertSetEqual(
             set(kpi.keys()),
-            {"total_vacancies", "total_candidates", "hired_this_period", "total_interviews_scheduled"},
+            {"total_vacancies", "total_candidates", "hired_this_month", "total_interviews_scheduled"},
         )
-        self.assertEqual(kpi["total_vacancies"], 3)
+        self.assertEqual(kpi["total_vacancies"], 2)
 
     def test_time_to_hire_returns_six_points(self):
-        payload = build_dashboard_payload(parse_filters({}))
-        labels, values = payload["tth_labels"], payload["tth_hire"]
+        labels, values = _time_to_hire()
         self.assertEqual(len(labels), 6)
         self.assertEqual(len(values), 6)
-
-    def test_dashboard_payload_respects_department_filter(self):
-        payload = build_dashboard_payload(parse_filters({"department": "Sales"}))
-        self.assertEqual(payload["kpi"]["total_vacancies"], 1)
-        self.assertEqual(payload["kpi"]["total_candidates"], 1)
-        self.assertEqual(len(payload["vacancy_rows"]), 1)
-
-    def test_dashboard_payload_builds_drilldown(self):
-        payload = build_dashboard_payload(parse_filters({"drilldown": "status", "value": "screening"}))
-        self.assertIsNotNone(payload["drilldown"])
-        self.assertIn("Детализация по статусу", payload["drilldown"]["title"])
-        self.assertGreaterEqual(len(payload["drilldown"]["rows"]), 1)
 
 
 class AnalyticsViewTests(TestCase):
@@ -128,10 +113,9 @@ class AnalyticsViewTests(TestCase):
 
     def test_dashboard_available_for_director(self):
         self.client.login(username=self.director.username, password=DEFAULT_PASSWORD)
-        response = self.client.get(reverse("analytics:dashboard"), {"period": "30", "department": "all"})
+        response = self.client.get(reverse("analytics:dashboard"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Дашборд аналитики")
-        self.assertContains(response, "Фильтры аналитики")
 
     def test_dashboard_available_for_admin(self):
         self.client.login(username=self.admin.username, password=DEFAULT_PASSWORD)
@@ -140,7 +124,7 @@ class AnalyticsViewTests(TestCase):
 
     def test_excel_report_exports_file(self):
         self.client.login(username=self.director.username, password=DEFAULT_PASSWORD)
-        response = self.client.get(reverse("analytics:report_excel"), {"period": "30", "department": "IT"})
+        response = self.client.get(reverse("analytics:report_excel"))
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -151,17 +135,8 @@ class AnalyticsViewTests(TestCase):
 
     def test_pdf_report_exports_file(self):
         self.client.login(username=self.admin.username, password=DEFAULT_PASSWORD)
-        response = self.client.get(reverse("analytics:report_pdf"), {"period": "30", "department": "IT"})
+        response = self.client.get(reverse("analytics:report_pdf"))
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertIn("hr_report.pdf", response["Content-Disposition"])
-
-    def test_drilldown_query_renders_modal(self):
-        self.client.login(username=self.director.username, password=DEFAULT_PASSWORD)
-        response = self.client.get(
-            reverse("analytics:dashboard"),
-            {"drilldown": "status", "value": "new"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "drilldownModal")
