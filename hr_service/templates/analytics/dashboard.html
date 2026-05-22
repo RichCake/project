@@ -6,12 +6,66 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h4 class="mb-0"><i class="bi bi-graph-up me-2"></i>Дашборд аналитики</h4>
   <div class="d-flex gap-2">
-    <a href="{% url 'analytics:report_excel' %}" class="btn btn-outline-success btn-sm">
+    <a href="{% url 'analytics:report_excel' %}{% if export_query %}?{{ export_query }}{% endif %}" class="btn btn-outline-success btn-sm">
       <i class="bi bi-file-earmark-excel me-1"></i> Excel
     </a>
-    <a href="{% url 'analytics:report_pdf' %}" class="btn btn-outline-danger btn-sm">
+    <a href="{% url 'analytics:report_pdf' %}{% if export_query %}?{{ export_query }}{% endif %}" class="btn btn-outline-danger btn-sm">
       <i class="bi bi-file-earmark-pdf me-1"></i> PDF
     </a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-white"><h6 class="mb-0">Фильтры аналитики</h6></div>
+  <div class="card-body">
+    <form method="get" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Период</label>
+        <select class="form-select" name="period">
+          {% for value, label in filter_options.periods %}
+            <option value="{{ value }}" {% if selected_filters.period == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Отдел</label>
+        <select class="form-select" name="department">
+          <option value="all" {% if selected_filters.department == 'all' %}selected{% endif %}>Все</option>
+          {% for department in filter_options.departments %}
+            <option value="{{ department }}" {% if selected_filters.department == department %}selected{% endif %}>{{ department }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted">Статус вакансии</label>
+        <select class="form-select" name="vacancy_status">
+          {% for value, label in filter_options.vacancy_statuses %}
+            <option value="{{ value }}" {% if selected_filters.vacancy_status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted">Статус отклика</label>
+        <select class="form-select" name="application_status">
+          {% for value, label in filter_options.application_statuses %}
+            <option value="{{ value }}" {% if selected_filters.application_status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small text-muted">Вакансия</label>
+        <select class="form-select" name="vacancy_id">
+          <option value="all" {% if selected_filters.vacancy_id == 'all' %}selected{% endif %}>Все</option>
+          {% for vacancy in filter_options.vacancies %}
+            <option value="{{ vacancy.id }}" {% if selected_filters.vacancy_id == vacancy.id|stringformat:'s' %}selected{% endif %}>{{ vacancy.title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm">Применить</button>
+        <a href="{% url 'analytics:dashboard' %}" class="btn btn-outline-secondary btn-sm">Сбросить</a>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -19,7 +73,7 @@
   <div class="col-sm-6 col-xl-3">
     <div class="card shadow-sm border-start border-primary border-4">
       <div class="card-body">
-        <div class="text-muted small">Открытых вакансий</div>
+        <div class="text-muted small">Вакансий в срезе</div>
         <div class="fs-3 fw-bold">{{ kpi.total_vacancies }}</div>
       </div>
     </div>
@@ -27,7 +81,7 @@
   <div class="col-sm-6 col-xl-3">
     <div class="card shadow-sm border-start border-info border-4">
       <div class="card-body">
-        <div class="text-muted small">Всего кандидатов</div>
+        <div class="text-muted small">Кандидатов в срезе</div>
         <div class="fs-3 fw-bold">{{ kpi.total_candidates }}</div>
       </div>
     </div>
@@ -35,8 +89,8 @@
   <div class="col-sm-6 col-xl-3">
     <div class="card shadow-sm border-start border-success border-4">
       <div class="card-body">
-        <div class="text-muted small">Нанято за месяц</div>
-        <div class="fs-3 fw-bold">{{ kpi.hired_this_month }}</div>
+        <div class="text-muted small">Нанято в срезе</div>
+        <div class="fs-3 fw-bold">{{ kpi.hired_this_period }}</div>
       </div>
     </div>
   </div>
@@ -50,16 +104,69 @@
   </div>
 </div>
 
+<div class="modal fade" id="drilldownModal" tabindex="-1" aria-labelledby="drilldownModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="drilldownModalLabel">
+          <i class="bi bi-zoom-in me-2"></i>{% if drilldown %}{{ drilldown.title }}{% else %}Детализация{% endif %}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body">
+        {% if drilldown %}
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                {% for col in drilldown.columns %}
+                  <th>{{ col }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in drilldown.rows %}
+                <tr>
+                  {% for value in row %}
+                    <td>{{ value }}</td>
+                  {% endfor %}
+                </tr>
+              {% empty %}
+                <tr><td colspan="{{ drilldown.columns|length }}" class="text-muted">Нет данных для выбранного среза</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Нажмите на столбец диаграммы или на чип, чтобы открыть детализацию.</p>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <a href="{% url 'analytics:dashboard' %}{% if base_filter_query %}?{{ base_filter_query }}{% endif %}" class="btn btn-outline-secondary btn-sm">Сбросить детализацию</a>
+        <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row g-4 mb-4">
   <div class="col-lg-6">
     <div class="card shadow-sm">
       <div class="card-header bg-white"><h6 class="mb-0">Воронка найма</h6></div>
-      <div class="card-body"><canvas id="funnelChart" height="260"></canvas></div>
+      <div class="card-body">
+        <canvas id="funnelChart" height="260"></canvas>
+        <div class="mt-3 small text-muted">Детализация по этапу:</div>
+        <div class="d-flex flex-wrap gap-1 mt-1">
+          {% for code, label in funnel_status_pairs %}
+            <a href="?{{ base_filter_query }}&drilldown=status&value={{ code }}" class="btn btn-sm btn-outline-primary">{{ label }}</a>
+          {% endfor %}
+        </div>
+      </div>
     </div>
   </div>
   <div class="col-lg-6">
     <div class="card shadow-sm">
-      <div class="card-header bg-white"><h6 class="mb-0">Время закрытия вакансий (дни)</h6></div>
+      <div class="card-header bg-white"><h6 class="mb-0">Скорость найма и обработки откликов (дни)</h6></div>
       <div class="card-body"><canvas id="tthChart" height="260"></canvas></div>
     </div>
   </div>
@@ -69,13 +176,105 @@
   <div class="col-lg-6">
     <div class="card shadow-sm">
       <div class="card-header bg-white"><h6 class="mb-0">Вакансии по отделам</h6></div>
-      <div class="card-body"><canvas id="deptChart" height="260"></canvas></div>
+      <div class="card-body">
+        <canvas id="deptChart" height="260"></canvas>
+        {% if department_labels %}
+        <div class="mt-3 small text-muted">Детализация по отделу:</div>
+        <div class="d-flex flex-wrap gap-1 mt-1">
+          {% for department in department_labels %}
+            <a href="?{{ base_filter_query }}&drilldown=department&value={{ department }}" class="btn btn-sm btn-outline-primary">{{ department }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
     </div>
   </div>
   <div class="col-lg-6">
     <div class="card shadow-sm">
-      <div class="card-header bg-white"><h6 class="mb-0">Конверсия по этапам (%)</h6></div>
+      <div class="card-header bg-white"><h6 class="mb-0">Переходы между этапами: доля перехода и потери</h6></div>
       <div class="card-body"><canvas id="convChart" height="260"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><h6 class="mb-0">Динамика откликов и найма (по неделям)</h6></div>
+      <div class="card-body"><canvas id="trendChart" height="120"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><h6 class="mb-0">Эффективность по отделам</h6></div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-striped align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Отдел</th>
+                <th>Вакансии</th>
+                <th>Отклики</th>
+                <th>Собеседования</th>
+                <th>Нанято</th>
+                <th>Доля найма</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in department_efficiency %}
+                <tr>
+                  <td>{{ row.department }}</td>
+                  <td>{{ row.vacancies }}</td>
+                  <td>{{ row.applications }}</td>
+                  <td>{{ row.interviews }}</td>
+                  <td>{{ row.hired }}</td>
+                  <td>{{ row.hire_rate }}%</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" class="text-muted">Нет данных для выбранных фильтров</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white"><h6 class="mb-0">Топ вакансий в срезе</h6></div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-striped align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Вакансия</th>
+                <th>Отдел</th>
+                <th>Статус</th>
+                <th>Отклики</th>
+                <th>На интервью</th>
+                <th>Нанято</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in vacancy_rows|slice:":10" %}
+                <tr>
+                  <td>{{ row.title }}</td>
+                  <td>{{ row.department }}</td>
+                  <td>{{ row.status }}</td>
+                  <td>{{ row.applications }}</td>
+                  <td>{{ row.interviews }}</td>
+                  <td>{{ row.hired }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" class="text-muted">Нет данных для выбранных фильтров</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -83,7 +282,7 @@
 <div class="row g-4">
   <div class="col-12">
     <div class="card shadow-sm">
-      <div class="card-header bg-white"><h6 class="mb-0">Heatmap: собеседования по дням и часам</h6></div>
+      <div class="card-header bg-white"><h6 class="mb-0">Карта нагрузки собеседований по дням и часам</h6></div>
       <div class="card-body">
         <div class="table-responsive">
           <table class="table table-sm table-bordered text-center mb-0" id="heatmapTable">
@@ -108,8 +307,30 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
 const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+const BASE_URL = "{% url 'analytics:dashboard' %}";
+const BASE_FILTER_QUERY = "{{ base_filter_query|escapejs }}";
+const DRILLDOWN_ACTIVE = {% if drilldown %}true{% else %}false{% endif %};
 
-new Chart(document.getElementById('funnelChart'), {
+function navigateWithDrilldown(type, value) {
+  const url = `${BASE_URL}?${BASE_FILTER_QUERY}&drilldown=${encodeURIComponent(type)}&value=${encodeURIComponent(value)}`;
+  window.location.href = url;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const modalEl = document.getElementById('drilldownModal');
+  if (!modalEl) return;
+  if (DRILLDOWN_ACTIVE && window.bootstrap) {
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+    modalEl.addEventListener('hidden.bs.modal', () => {
+      const cleanUrl = `${BASE_URL}?${BASE_FILTER_QUERY}`;
+      window.history.replaceState({}, '', cleanUrl);
+    }, { once: true });
+  }
+});
+
+const funnelCanvas = document.getElementById('funnelChart');
+const funnelChart = new Chart(funnelCanvas, {
   type: 'bar',
   data: {
     labels: {{ funnel_labels|safe }},
@@ -119,45 +340,108 @@ new Chart(document.getElementById('funnelChart'), {
       backgroundColor: COLORS,
     }]
   },
-  options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  options: {
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true } }
+  }
+});
+funnelCanvas.addEventListener('click', (event) => {
+  let points = funnelChart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
+  if (!points.length) {
+    points = funnelChart.getElementsAtEventForMode(event, 'index', { intersect: false }, true);
+  }
+  if (!points.length) return;
+  const index = points[0].index;
+  const statusCodes = ['new', 'screening', 'interview', 'offer', 'hired', 'rejected'];
+  navigateWithDrilldown('status', statusCodes[index]);
 });
 
 new Chart(document.getElementById('tthChart'), {
   type: 'bar',
   data: {
     labels: {{ tth_labels|safe }},
-    datasets: [{
-      label: 'Дней',
-      data: {{ tth_data|safe }},
-      backgroundColor: '#3b82f6',
-    }]
+    datasets: [
+      {
+        label: 'Скорость найма',
+        data: {{ tth_hire|safe }},
+        backgroundColor: '#3b82f6',
+      },
+      {
+        label: 'Скорость обработки',
+        data: {{ tth_process|safe }},
+        backgroundColor: '#10b981',
+      }
+    ]
   },
-  options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  options: { scales: { y: { beginAtZero: true } } }
 });
 
-new Chart(document.getElementById('deptChart'), {
+const deptCanvas = document.getElementById('deptChart');
+const deptChart = new Chart(deptCanvas, {
   type: 'doughnut',
   data: {
     labels: {{ dept_labels|safe }},
     datasets: [{ data: {{ dept_data|safe }}, backgroundColor: COLORS }]
-  },
+  }
+});
+deptCanvas.addEventListener('click', (event) => {
+  let points = deptChart.getElementsAtEventForMode(event, 'nearest', { intersect: true }, true);
+  if (!points.length) {
+    points = deptChart.getElementsAtEventForMode(event, 'nearest', { intersect: false }, true);
+  }
+  if (!points.length) return;
+  const index = points[0].index;
+  const department = deptChart.data.labels[index];
+  navigateWithDrilldown('department', department);
 });
 
 new Chart(document.getElementById('convChart'), {
   type: 'bar',
   data: {
     labels: {{ conv_labels|safe }},
-    datasets: [{
-      label: '%',
-      data: {{ conv_data|safe }},
-      backgroundColor: '#10b981',
-    }]
+    datasets: [
+      {
+        label: 'Доля перехода, %',
+        data: {{ conv_data|safe }},
+        backgroundColor: '#10b981',
+      },
+      {
+        label: 'Потери, %',
+        data: {{ dropoff_data|safe }},
+        backgroundColor: '#ef4444',
+      }
+    ]
   },
   options: {
     indexAxis: 'y',
-    plugins: { legend: { display: false } },
     scales: { x: { beginAtZero: true, max: 100 } }
   }
+});
+
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: {{ trend_labels|safe }},
+    datasets: [
+      {
+        label: 'Отклики',
+        data: {{ trend_apps|safe }},
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.15)',
+        tension: 0.3,
+        fill: true
+      },
+      {
+        label: 'Найм',
+        data: {{ trend_hired|safe }},
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16,185,129,0.15)',
+        tension: 0.3,
+        fill: true
+      }
+    ]
+  },
+  options: { scales: { y: { beginAtZero: true } } }
 });
 
 // Heatmap
