@@ -15,4 +15,5 @@ urlpatterns = [
     path("templates/", views.survey_template_list, name="survey_template_list"),
     path("templates/create/", views.survey_template_create, name="survey_template_create"),
     path("templates/<int:pk>/edit/", views.survey_template_edit, name="survey_template_edit"),
+    path("templates/<int:pk>/delete/", views.survey_template_delete, name="survey_template_delete"),
 ]

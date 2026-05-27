@@ -3,7 +3,7 @@ from django.urls import reverse
 
 from accounts.models import User
 from chat.forms import CreateChatForm, SurveyQuestionForm
-from chat.models import ChatRoom, Message, Survey, SurveyAnswer, SurveyQuestion
+from chat.models import ChatRoom, Message, Survey, SurveyAnswer, SurveyQuestion, SurveyTemplate
 from tests.factories import (
     DEFAULT_PASSWORD,
     create_chat_room,
@@ -34,7 +34,7 @@ class ChatModelAndFormTests(TestCase):
 
     def test_survey_question_form_valid(self):
         form = SurveyQuestionForm(
-            data={"text": "Ваш опыт?", "question_type": SurveyQuestion.QuestionType.TEXT, "order": 1}
+            data={"text": "Ваш опыт?", "question_type": SurveyQuestion.QuestionType.TEXT}
         )
         self.assertTrue(form.is_valid())
 
@@ -167,12 +167,11 @@ class ChatViewTests(TestCase):
                 "add_question": "1",
                 "text": "Готовы начать?",
                 "question_type": SurveyQuestion.QuestionType.YES_NO,
-                "order": 2,
                 "options_text": "",
             },
         )
         self.assertEqual(response.status_code, 302)
-        created_question = SurveyQuestion.objects.get(template=self.template, order=2)
+        created_question = SurveyQuestion.objects.get(template=self.template, text="Готовы начать?")
 
         response = self.client.post(
             reverse("chat:survey_template_edit", kwargs={"pk": self.template.pk}),
@@ -180,3 +179,40 @@ class ChatViewTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertFalse(SurveyQuestion.objects.filter(pk=created_question.pk).exists())
+
+    def test_manager_can_update_reorder_and_delete_template(self):
+        q2 = create_survey_question(
+            self.template, order=2, text="Второй вопрос", options=[]
+        )
+        self.client.login(username=self.hr.username, password=DEFAULT_PASSWORD)
+
+        response = self.client.post(
+            reverse("chat:survey_template_edit", kwargs={"pk": self.template.pk}),
+            {
+                "update_question": "1",
+                "question_id": self.question.pk,
+                "text": "Обновлённый вопрос",
+                "question_type": SurveyQuestion.QuestionType.TEXT,
+                "options_text": "",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.text, "Обновлённый вопрос")
+
+        response = self.client.post(
+            reverse("chat:survey_template_edit", kwargs={"pk": self.template.pk}),
+            {"move_question_down": "1", "question_id": self.question.pk},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.question.refresh_from_db()
+        q2.refresh_from_db()
+        self.assertEqual(self.question.order, 2)
+        self.assertEqual(q2.order, 1)
+
+        template_pk = self.template.pk
+        response = self.client.post(
+            reverse("chat:survey_template_delete", kwargs={"pk": template_pk}),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(SurveyTemplate.objects.filter(pk=template_pk).exists())

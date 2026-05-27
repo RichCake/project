@@ -34,9 +34,11 @@
           <i class="bi bi-chat-dots me-1"></i>
           {% if user.is_candidate %}{{ room.recruiter }}{% else %}{{ room.candidate }}{% endif %}
         </h6>
-        <a href="{% url 'chat:room_list' %}" class="btn btn-sm btn-outline-secondary">
-          <i class="bi bi-arrow-left"></i> К списку
-        </a>
+        {% if notuser.is_candidate %}
+          <a href="{% url 'chat:room_list' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> К списку
+          </a>
+        {% endif %}
       </div>
       <div class="card-body p-3">
         <div class="chat-container" id="chatContainer">

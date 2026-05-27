@@ -22,32 +22,95 @@
       </div>
     {% else %}
       <div class="card shadow-sm mb-4">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
           <h5 class="mb-0">{{ template_obj.title }}</h5>
-          <a href="{% url 'chat:survey_template_list' %}" class="btn btn-sm btn-outline-secondary">К списку</a>
+          <div class="d-flex gap-2">
+            <a href="{% url 'chat:survey_template_list' %}" class="btn btn-sm btn-outline-secondary">К списку</a>
+            <form method="post" action="{% url 'chat:survey_template_delete' template_obj.pk %}"
+                  onsubmit="return confirm('Удалить шаблон «{{ template_obj.title|escapejs }}»?\n\nСвязанные опросы кандидатов будут удалены. У этапов вакансий шаблон будет отвязан.');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash me-1"></i> Удалить шаблон
+              </button>
+            </form>
+          </div>
         </div>
       </div>
+
+      {% if edit_q_form %}
+        <div class="card shadow-sm mb-4 border-primary">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Редактирование вопроса</h6>
+            <a href="{% url 'chat:survey_template_edit' template_obj.pk %}" class="btn btn-sm btn-outline-secondary">Отмена</a>
+          </div>
+          <div class="card-body">
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="question_id" value="{{ editing_question_id }}">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">{{ edit_q_form.text.label }}</label>
+                  {{ edit_q_form.text }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ edit_q_form.question_type.label }}</label>
+                  {{ edit_q_form.question_type }}
+                </div>
+                <div class="col-12">
+                  <label class="form-label">{{ edit_q_form.options_text.label }}</label>
+                  {{ edit_q_form.options_text }}
+                  <div class="form-text">Только для типа «Выбор»</div>
+                </div>
+              </div>
+              <button type="submit" name="update_question" class="btn btn-primary mt-3">Сохранить</button>
+            </form>
+          </div>
+        </div>
+      {% endif %}
 
       {% if questions %}
         <div class="card shadow-sm mb-4">
           <div class="card-header bg-white"><h6 class="mb-0">Вопросы</h6></div>
           <div class="list-group list-group-flush">
             {% for q in questions %}
-              <div class="list-group-item d-flex justify-content-between align-items-start">
-                <div>
-                  <strong>{{ q.order }}.</strong> {{ q.text }}
+              <div class="list-group-item d-flex justify-content-between align-items-start gap-2">
+                <div class="flex-grow-1">
+                  <strong>{{ forloop.counter }}.</strong> {{ q.text }}
                   <span class="badge bg-secondary ms-2">{{ q.get_question_type_display }}</span>
                   {% if q.options %}
                     <div class="small text-muted mt-1">Варианты: {{ q.options|join:", " }}</div>
                   {% endif %}
                 </div>
-                <form method="post" class="ms-2">
-                  {% csrf_token %}
-                  <input type="hidden" name="question_id" value="{{ q.pk }}">
-                  <button type="submit" name="delete_question" class="btn btn-sm btn-outline-danger">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </form>
+                <div class="d-flex gap-1 flex-shrink-0">
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="question_id" value="{{ q.pk }}">
+                    <button type="submit" name="move_question_up" class="btn btn-sm btn-outline-secondary"
+                            title="Выше" {% if forloop.first %}disabled{% endif %}>
+                      <i class="bi bi-arrow-up"></i>
+                    </button>
+                  </form>
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="question_id" value="{{ q.pk }}">
+                    <button type="submit" name="move_question_down" class="btn btn-sm btn-outline-secondary"
+                            title="Ниже" {% if forloop.last %}disabled{% endif %}>
+                      <i class="bi bi-arrow-down"></i>
+                    </button>
+                  </form>
+                  <a href="{% url 'chat:survey_template_edit' template_obj.pk %}?edit={{ q.pk }}"
+                     class="btn btn-sm btn-outline-primary" title="Редактировать">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <form method="post"
+                        onsubmit="return confirm('Удалить этот вопрос?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="question_id" value="{{ q.pk }}">
+                    <button type="submit" name="delete_question" class="btn btn-sm btn-outline-danger" title="Удалить">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </div>
               </div>
             {% endfor %}
           </div>
@@ -67,10 +130,6 @@
               <div class="col-md-6">
                 <label class="form-label">{{ q_form.question_type.label }}</label>
                 {{ q_form.question_type }}
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">{{ q_form.order.label }}</label>
-                {{ q_form.order }}
               </div>
               <div class="col-12">
                 <label class="form-label">{{ q_form.options_text.label }}</label>

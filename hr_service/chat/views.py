@@ -3,6 +3,7 @@ import json
 from django.contrib import messages as django_messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db.models import Max
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -92,7 +93,7 @@ def api_messages(request, pk):
             "sender_id": m.sender_id,
             "text": m.text,
             "is_system": m.is_system,
-            "created_at": m.created_at.strftime("%H:%M"),
+            "created_at": timezone.localtime(m.created_at).strftime("%H:%M"),
         })
     return JsonResponse({"messages": data})
 
@@ -118,7 +119,7 @@ def api_send(request, pk):
         "id": msg.id,
         "sender": str(user),
         "text": msg.text,
-        "created_at": msg.created_at.strftime("%H:%M"),
+        "created_at": timezone.localtime(msg.created_at).strftime("%H:%M"),
     })
 
 
@@ -207,10 +208,54 @@ def survey_results(request, pk):
     })
 
 
+def _apply_question_options(question, options_text):
+    if options_text:
+        question.options = [o.strip() for o in options_text.strip().split("\n") if o.strip()]
+    else:
+        question.options = []
+
+
+def _next_question_order(template):
+    max_order = template.questions.aggregate(m=Max("order"))["m"]
+    return (max_order or 0) + 1
+
+
+def _normalize_question_order(template):
+    for idx, q in enumerate(template.questions.order_by("order", "pk"), start=1):
+        if q.order != idx:
+            SurveyQuestion.objects.filter(pk=q.pk).update(order=idx)
+
+
+def _move_question(template, question_id, direction):
+    ordered = list(template.questions.order_by("order", "pk"))
+    try:
+        idx = next(i for i, q in enumerate(ordered) if q.pk == int(question_id))
+    except (StopIteration, ValueError, TypeError):
+        return False
+    new_idx = idx + direction
+    if new_idx < 0 or new_idx >= len(ordered):
+        return False
+    ordered[idx], ordered[new_idx] = ordered[new_idx], ordered[idx]
+    for i, q in enumerate(ordered, start=1):
+        q.order = i
+    SurveyQuestion.objects.bulk_update(ordered, ["order"])
+    return True
+
+
 @manager_required
 def survey_template_list(request):
     templates = SurveyTemplate.objects.all()
     return render(request, "chat/survey_template_list.html", {"templates": templates})
+
+
+@require_POST
+@manager_required
+def survey_template_delete(request, pk):
+    tmpl = get_object_or_404(SurveyTemplate, pk=pk)
+    title = tmpl.title
+    tmpl.delete()
+    django_messages.success(request, f"Шаблон «{title}» удалён.")
+    return redirect("chat:survey_template_list")
 
 
 @manager_required
@@ -232,6 +277,7 @@ def survey_template_create(request):
 def survey_template_edit(request, pk):
     tmpl = get_object_or_404(SurveyTemplate, pk=pk)
     questions = tmpl.questions.all()
+    editing_question_id = request.GET.get("edit")
 
     if request.method == "POST":
         if "add_question" in request.POST:
@@ -239,23 +285,48 @@ def survey_template_edit(request, pk):
             if q_form.is_valid():
                 q = q_form.save(commit=False)
                 q.template = tmpl
-                options_text = q_form.cleaned_data.get("options_text", "")
-                if options_text:
-                    q.options = [o.strip() for o in options_text.strip().split("\n") if o.strip()]
+                q.order = _next_question_order(tmpl)
+                _apply_question_options(q, q_form.cleaned_data.get("options_text", ""))
                 q.save()
                 django_messages.success(request, "Вопрос добавлен.")
                 return redirect("chat:survey_template_edit", pk=pk)
+        elif "update_question" in request.POST:
+            q = get_object_or_404(SurveyQuestion, pk=request.POST.get("question_id"), template=tmpl)
+            q_form = SurveyQuestionForm(request.POST, instance=q)
+            if q_form.is_valid():
+                q = q_form.save(commit=False)
+                _apply_question_options(q, q_form.cleaned_data.get("options_text", ""))
+                q.save()
+                django_messages.success(request, "Вопрос обновлён.")
+                return redirect("chat:survey_template_edit", pk=pk)
         elif "delete_question" in request.POST:
-            q_id = request.POST.get("question_id")
-            SurveyQuestion.objects.filter(pk=q_id, template=tmpl).delete()
+            SurveyQuestion.objects.filter(
+                pk=request.POST.get("question_id"), template=tmpl
+            ).delete()
+            _normalize_question_order(tmpl)
+            django_messages.success(request, "Вопрос удалён.")
+            return redirect("chat:survey_template_edit", pk=pk)
+        elif "move_question_up" in request.POST:
+            if _move_question(tmpl, request.POST.get("question_id"), -1):
+                django_messages.success(request, "Порядок вопросов изменён.")
+            return redirect("chat:survey_template_edit", pk=pk)
+        elif "move_question_down" in request.POST:
+            if _move_question(tmpl, request.POST.get("question_id"), 1):
+                django_messages.success(request, "Порядок вопросов изменён.")
             return redirect("chat:survey_template_edit", pk=pk)
 
     q_form = SurveyQuestionForm()
-    tmpl_form = SurveyTemplateForm(instance=tmpl)
+    edit_q_form = None
+    editing_question_pk = None
+    if editing_question_id:
+        edit_q = get_object_or_404(SurveyQuestion, pk=editing_question_id, template=tmpl)
+        edit_q_form = SurveyQuestionForm(instance=edit_q)
+        editing_question_pk = edit_q.pk
 
     return render(request, "chat/survey_template_form.html", {
-        "form": tmpl_form,
         "q_form": q_form,
+        "edit_q_form": edit_q_form,
+        "editing_question_id": editing_question_pk,
         "template_obj": tmpl,
         "questions": questions,
         "is_new": False,

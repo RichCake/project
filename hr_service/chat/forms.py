@@ -38,9 +38,13 @@ class SurveyQuestionForm(forms.ModelForm):
 
     class Meta:
         model = SurveyQuestion
-        fields = ("text", "question_type", "order")
+        fields = ("text", "question_type")
         widgets = {
             "text": forms.TextInput(attrs={"class": "form-control"}),
             "question_type": forms.Select(attrs={"class": "form-select"}),
-            "order": forms.NumberInput(attrs={"class": "form-control"}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.options:
+            self.fields["options_text"].initial = "\n".join(self.instance.options)

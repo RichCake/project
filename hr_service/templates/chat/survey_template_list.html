@@ -29,10 +29,17 @@
             <td>{{ t.questions.count }}</td>
             <td>{{ t.created_by|default:"—" }}</td>
             <td>{{ t.created_at|date:"d.m.Y" }}</td>
-            <td class="text-end">
-              <a href="{% url 'chat:survey_template_edit' t.pk %}" class="btn btn-sm btn-outline-primary">
+            <td class="text-end text-nowrap">
+              <a href="{% url 'chat:survey_template_edit' t.pk %}" class="btn btn-sm btn-outline-primary" title="Редактировать">
                 <i class="bi bi-pencil"></i>
               </a>
+              <form method="post" action="{% url 'chat:survey_template_delete' t.pk %}" class="d-inline"
+                    onsubmit="return confirm('Удалить шаблон «{{ t.title|escapejs }}»?\n\nСвязанные опросы кандидатов будут удалены. У этапов вакансий шаблон будет отвязан.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
             </td>
           </tr>
         {% empty %}
