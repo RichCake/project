@@ -8,5 +8,6 @@ dependencies = [
     "django>=6.0.3",
     "django-widget-tweaks>=1.5.1",
     "openpyxl>=3.1.5",
+    "python-dotenv>=1.1.0",
     "reportlab>=4.4.10",
 ]

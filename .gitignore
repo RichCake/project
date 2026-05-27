@@ -8,6 +8,7 @@ wheels/
 
 # Virtual environments
 .venv
+.env
 db.sqlite3
 .DS_store
 hr_service/media

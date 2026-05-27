@@ -1,12 +1,35 @@
+import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
 
-SECRET_KEY = "django-insecure-er&3@k_&%xnc9z*^%b+!od9wsfv65a07nna6l+^din#4uzy(d+"
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(BASE_DIR / ".env")
 
-DEBUG = True
 
-ALLOWED_HOSTS = ["*"]
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: str = "") -> list[str]:
+    value = os.getenv(name, default)
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "django-insecure-er&3@k_&%xnc9z*^%b+!od9wsfv65a07nna6l+^din#4uzy(d+",
+)
+DEBUG = env_bool("DEBUG", default=True)
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", default="*") or ["*"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -52,12 +75,28 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "hr_service.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+DB_ENGINE = os.getenv("DB_ENGINE", "sqlite").lower()
+
+if DB_ENGINE == "sqlite":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / os.getenv("DB_NAME", "db.sqlite3"),
+        }
     }
-}
+elif DB_ENGINE == "postgresql":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ["DB_NAME"],
+            "USER": os.environ["DB_USER"],
+            "PASSWORD": os.environ["DB_PASSWORD"],
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+        }
+    }
+else:
+    raise ValueError(f"Unsupported DB_ENGINE: {DB_ENGINE!r}. Use 'sqlite' or 'postgresql'.")
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -68,16 +107,16 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTH_USER_MODEL = "accounts.User"
 
-LANGUAGE_CODE = "ru"
-TIME_ZONE = "Europe/Moscow"
+LANGUAGE_CODE = os.getenv("LANGUAGE_CODE", "ru")
+TIME_ZONE = os.getenv("TIME_ZONE", "Europe/Moscow")
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+STATIC_URL = os.getenv("STATIC_URL", "static/")
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = os.getenv("MEDIA_URL", "media/")
+MEDIA_ROOT = BASE_DIR / os.getenv("MEDIA_ROOT", "media")
 
 LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "home"
