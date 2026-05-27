@@ -1,0 +1,29 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: django
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            cd /srv/hr_service
+            git pull origin main
+
+            uv sync
+
+            cd /srv/hr_service/hr_service
+            uv run ./manage.py migrate --noinput
+            uv run ./manage.py collectstatic --noinput --clear
+
+            sudo systemctl restart hr
+            sudo systemctl status hr --no-pager -l
