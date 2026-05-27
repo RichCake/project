@@ -26,4 +26,4 @@ jobs:
             /home/django/.local/bin/uv run ./manage.py collectstatic --noinput --clear
 
             sudo systemctl restart hr
-            sudo systemctl status hr --no-pager -l
+            sudo systemctl status hr
