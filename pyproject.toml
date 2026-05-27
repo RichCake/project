@@ -10,4 +10,5 @@ dependencies = [
     "openpyxl>=3.1.5",
     "python-dotenv>=1.1.0",
     "reportlab>=4.4.10",
+    "uvicorn>=0.48.0",
 ]
