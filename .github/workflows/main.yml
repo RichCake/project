@@ -19,11 +19,11 @@ jobs:
             cd /srv/hr_service
             git pull origin main
 
-            uv sync
+            home/django/.local/bin/uv sync
 
             cd /srv/hr_service/hr_service
-            uv run ./manage.py migrate --noinput
-            uv run ./manage.py collectstatic --noinput --clear
+            home/django/.local/bin/uv run ./manage.py migrate --noinput
+            home/django/.local/bin/uv run ./manage.py collectstatic --noinput --clear
 
             sudo systemctl restart hr
             sudo systemctl status hr --no-pager -l
