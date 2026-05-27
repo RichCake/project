@@ -96,10 +96,14 @@ elif DB_ENGINE == "postgresql":
         }
     }
 else:
-    raise ValueError(f"Unsupported DB_ENGINE: {DB_ENGINE!r}. Use 'sqlite' or 'postgresql'.")
+    raise ValueError(
+        f"Unsupported DB_ENGINE: {DB_ENGINE!r}. Use 'sqlite' or 'postgresql'."
+    )
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -114,6 +118,7 @@ USE_TZ = True
 
 STATIC_URL = os.getenv("STATIC_URL", "static/")
 STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = os.getenv("STATIC_ROOT")
 
 MEDIA_URL = os.getenv("MEDIA_URL", "media/")
 MEDIA_ROOT = BASE_DIR / os.getenv("MEDIA_ROOT", "media")
