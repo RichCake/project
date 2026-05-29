@@ -27,6 +27,8 @@
       overflow-y: auto;
       z-index: 1030;
       transition: transform .2s;
+      display: flex;
+      flex-direction: column;
     }
     .sidebar-brand {
       height: var(--topbar-height);
@@ -41,7 +43,63 @@
       filter: invert(1);
       flex-shrink: 0;
     }
-    .sidebar-nav { padding: .75rem 0; }
+    .sidebar-nav { padding: .75rem 0; flex: 1; }
+    .sidebar-footer {
+      padding: .75rem 1.25rem 1rem;
+      border-top: 1px solid #334155;
+      margin-top: auto;
+    }
+    .sidebar-footer-link {
+      font-size: .68rem;
+      color: #475569;
+      text-decoration: none;
+      line-height: 1.35;
+      display: block;
+    }
+    .sidebar-footer-link:hover { color: #64748b; text-decoration: underline; }
+    .public-main {
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+    .privacy-policy-body {
+      white-space: pre-wrap;
+      font-size: .95rem;
+      line-height: 1.6;
+    }
+    .cookie-consent {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border-top: 1px solid #e2e8f0;
+      padding: .85rem 1.25rem;
+      z-index: 1050;
+      box-shadow: 0 -4px 24px rgba(15, 23, 42, .08);
+    }
+    .cookie-consent[hidden] { display: none !important; }
+    .cookie-consent-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem 1rem;
+    }
+    .cookie-consent-text {
+      font-size: .85rem;
+      color: #475569;
+      flex: 1 1 240px;
+    }
+    .cookie-consent-text a { color: #3b82f6; }
+    @media (min-width: 992px) {
+      body.authenticated .cookie-consent {
+        left: var(--sidebar-width);
+      }
+    }
     .sidebar-nav .nav-link {
       color: #94a3b8; padding: .6rem 1.25rem;
       display: flex; align-items: center; gap: .65rem;
@@ -81,7 +139,7 @@
   </style>
   {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body class="{% if user.is_authenticated %}authenticated{% endif %}">
 {% if user.is_authenticated %}
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-brand">
@@ -144,6 +202,12 @@
         </a>
       {% endif %}
     </div>
+    <div class="sidebar-footer">
+      <a class="sidebar-footer-link"
+         href="{% url 'accounts:privacy_policy' %}">
+        Политика обработки персональных данных
+      </a>
+    </div>
   </nav>
 
   <div class="topbar">
@@ -176,22 +240,37 @@
     </div>
   </div>
 
-  <main class="main-content">
-    {% if messages %}
-      {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-      {% endfor %}
-    {% endif %}
-    {% block content %}{% endblock %}
-  </main>
-{% else %}
-  {% block anonymous_content %}{% endblock %}
 {% endif %}
 
+<main class="{% if user.is_authenticated %}main-content{% else %}public-main{% endif %}">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+{% include "includes/cookie_consent.html" %}
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function () {
+  var KEY = "hr_cookie_consent";
+  var banner = document.getElementById("cookie-consent");
+  var acceptBtn = document.getElementById("cookie-accept");
+  if (!banner || !acceptBtn) return;
+  if (localStorage.getItem(KEY)) return;
+  banner.hidden = false;
+  acceptBtn.addEventListener("click", function () {
+    localStorage.setItem(KEY, "accepted");
+    banner.hidden = true;
+  });
+})();
+</script>
 {% if user.is_authenticated %}
 <script>
 function updateNotifications() {

@@ -1,10 +1,29 @@
-from django.contrib.auth import login
+from pathlib import Path
+
+from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.shortcuts import redirect, render
-from django.contrib import messages
 
 from .forms import LoginForm, ProfileForm
+
+POLICY_TEXT_PATH = Path(settings.BASE_DIR) / "legal" / "policy_text.txt"
+
+
+def _load_policy_text() -> str:
+    try:
+        return POLICY_TEXT_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def privacy_policy_view(request):
+    return render(
+        request,
+        "legal/privacy_policy.html",
+        {"policy_text": _load_policy_text()},
+    )
 
 
 class CustomLoginView(LoginView):

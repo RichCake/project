@@ -21,6 +21,43 @@
       background: #3b82f6; color: #fff;
       padding: 2rem; text-align: center;
     }
+    .login-footer {
+      padding: 0 1.5rem 1.25rem;
+      text-align: center;
+    }
+    .login-footer a {
+      font-size: .72rem;
+      color: #94a3b8;
+      text-decoration: none;
+    }
+    .login-footer a:hover { color: #64748b; text-decoration: underline; }
+    .cookie-consent {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border-top: 1px solid #e2e8f0;
+      padding: .85rem 1.25rem;
+      z-index: 1050;
+      box-shadow: 0 -4px 24px rgba(15, 23, 42, .08);
+    }
+    .cookie-consent[hidden] { display: none !important; }
+    .cookie-consent-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem 1rem;
+    }
+    .cookie-consent-text {
+      font-size: .85rem;
+      color: #475569;
+      flex: 1 1 200px;
+    }
+    .cookie-consent-text a { color: #3b82f6; }
   </style>
 </head>
 <body>
@@ -51,6 +88,24 @@
         </button>
       </form>
     </div>
+    <div class="login-footer">
+      <a href="{% url 'accounts:privacy_policy' %}">Политика обработки персональных данных</a>
+    </div>
   </div>
+  {% include "includes/cookie_consent.html" %}
+  <script>
+  (function () {
+    var KEY = "hr_cookie_consent";
+    var banner = document.getElementById("cookie-consent");
+    var acceptBtn = document.getElementById("cookie-accept");
+    if (!banner || !acceptBtn) return;
+    if (localStorage.getItem(KEY)) return;
+    banner.hidden = false;
+    acceptBtn.addEventListener("click", function () {
+      localStorage.setItem(KEY, "accepted");
+      banner.hidden = true;
+    });
+  })();
+  </script>
 </body>
 </html>

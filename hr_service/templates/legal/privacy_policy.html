@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Политика обработки персональных данных — HR-Сервис{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-10 col-xl-8">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white">
+        <h5 class="mb-0">Политика обработки персональных данных</h5>
+      </div>
+      <div class="card-body privacy-policy-body">
+        {% if policy_text %}
+          {{ policy_text }}
+        {% else %}
+          <p class="text-muted mb-0">
+            Текст политики пока не добавлен. Отредактируйте файл
+            <code>hr_service/legal/policy_text.txt</code>.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
